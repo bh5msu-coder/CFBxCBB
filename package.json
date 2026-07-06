@@ -1,0 +1,21 @@
+{
+  "name": "cfbxcbb",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "CFB × CBB Power Index — 50-season program rankings",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.12.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.2"
+  }
+}
