@@ -9,15 +9,41 @@ Programs carry era-bucketed scores (1976–89 / 1990–99 / 2000–09 / 2010–2
 ### Views
 - **Ladder** — tiered rankings (Blue Blood / Elite / Power / Solid / Rising)
 - **Quadrant** — two-sport scatter plot (football vs. basketball)
-- **Heatmap** — sortable per-family breakdown table
+- **Heatmap** — sortable per-family breakdown table (family cells reconcile with the shown score)
+- **Champions** — season-by-season national-title ledger (the forward-looking surface)
 
 ### Features
 - Sport toggle (Football / Basketball / Combined, with a two-sport balance bonus)
 - Era-window selection + recency weighting
 - Adjustable metric weights
 - Conference filter, name search, and program spotlighting
-- Vacated-results toggle (official vs. on-field)
+- Vacated-results toggle (Official vs. On-field) — **now actually re-scores** flagged programs
+- Light / dark theme (follows your OS preference, with a manual toggle)
+- CSV export of the current ranking
 - Per-program detail modal and a methodology panel
+- Accessible: keyboard-operable controls, visible focus states, `prefers-reduced-motion` support, and WCAG-minded contrast
+
+### Design & structure
+
+The UI follows a data-dense dashboard system (Fira Sans / Fira Code, blue + amber on a blue-biased neutral ground, both themes designed rather than inverted). Code is split into focused modules:
+
+- `src/data.js` — programs, raw-figure annotations, and the **champions ledger**
+- `src/scoring.js` — the era-weighted composite engine (incl. the vacated adjustment and heatmap blend)
+- `src/theme.js` — the two theme token maps and font stacks
+- `src/icons.jsx` — inline SVG icon set
+- `src/App.jsx` — views and interaction
+
+## Adding a future season
+
+The **Champions** tab is designed to grow. As each national title becomes official, edit the `CHAMPIONS` array at the top of [`src/data.js`](src/data.js) — nothing else needs to change:
+
+```js
+// most recent season first
+{ year: 2025, cfb: "Ohio State", cbb: "Florida" },  // fill in the CFB champ once decided
+{ year: 2026, cfb: null,         cbb: null },        // null renders as an "awaiting result" row
+```
+
+Use a name that matches a program in `PROGRAMS` and the champion becomes a clickable cross-link to its Power Index profile. Push to `main` and the site redeploys automatically.
 
 > **Data note:** National titles, Final Fours, and conference affiliation are high-confidence aggregates. Recruiting, poll-weeks, advanced metrics, pro production, and era-split win% are calibrated analyst estimates on a relative 0–100 scale — not exact sourced season figures.
 
