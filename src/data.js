@@ -123,7 +123,10 @@ export const PROGRAMS = [
     cbb: P([90,92,90,96],[94,92,86,92],[90,92,94,90],[null,94,96,98],[92,92,90,94],[90,90,92,92]) },
   { name: "Kansas", conf: "Big 12", cfb: P([22,28,55,42],[25,30,58,45],[28,34,62,50],[null,36,64,56],[20,28,56,44],[24,32,60,50]),
     cbb: P([82,88,92,96],[90,92,94,94],[86,90,96,94],[null,92,96,96],[88,90,94,96],[86,90,94,96]) },
-  { name: "Indiana", conf: "Big Ten", cfb: P([22,28,32,42],[25,30,34,45],[28,32,38,50],[null,34,44,56],[20,28,32,46],[24,30,38,50]),
+  // CFB E4 lifted to reflect the Cignetti surge: 2024 CFP berth + a 16-0 2025
+  // national title (def. Miami 27–21). Era avg still modest — Indiana was weak
+  // for most of 2010–24 — but no longer bottom-tier, matching its champion status.
+  { name: "Indiana", conf: "Big Ten", cfb: P([22,28,32,64],[25,30,34,60],[28,32,38,58],[null,34,44,62],[20,28,32,62],[24,30,38,64]),
     cbb: P([92,72,62,55],[78,68,58,58],[72,64,62,64],[null,66,68,70],[90,72,62,58],[86,68,62,60]) },
   { name: "Louisville", conf: "ACC", vacated: true, cfb: P([45,52,62,70],[50,56,66,68],[52,58,70,74],[null,60,74,78],[44,52,64,70],[48,56,68,72]),
     cbb: P([72,68,75,82],[70,72,78,80],[68,74,82,84],[null,72,84,86],[70,70,76,82],[68,72,80,82]) },
@@ -225,20 +228,27 @@ export const CONFS = ["All", ...Array.from(new Set(ACTIVE.map((p) => p.conf))).s
 // surface: as each new title is decided, append one row here — nothing else in
 // the app needs to change. `cfb` is keyed by the season year (title game the
 // following January); `cbb` by the season's spring championship year.
-// `null` marks a season whose champion is not yet official — the UI renders it
-// as an "awaiting result" row so it is obvious what to fill in next.
+// `null`      → champion not yet official; UI renders an "awaiting result" row.
+// `CANCELLED` → season played no championship (e.g. COVID); UI renders "not held".
 //
 //   TO ADD A FUTURE SEASON: add/replace a row below with the champion's name.
 //   Names should match a program in PROGRAMS to get a clickable cross-link.
+//
+// Ledger verified July 2026 against NCAA.com, ESPN, and CFP.com:
+//   · 2025 CFB — Indiana def. Miami (FL) 27–21 (Jan 19, 2026), first-ever title.
+//   · 2026 CBB — Michigan def. UConn 69–63 (Apr 6, 2026), first title since 1989.
+//   · 2020 CBB — no champion; the 2019–20 NCAA tournament was cancelled (COVID-19).
 // ---------------------------------------------------------------------------
+export const CANCELLED = "__cancelled__"; // season with no championship held
+
 export const CHAMPIONS = [
-  { year: 2026, cfb: null,             cbb: null },              // awaiting: CFP title Jan 2027 · NCAA tourney Apr 2026
-  { year: 2025, cfb: null,             cbb: "Florida" },         // CFP title game Jan 2026 pending · Florida won Apr 2025
+  { year: 2026, cfb: null,             cbb: "Michigan" },        // CFP title game Jan 2027 pending · Michigan won Apr 2026
+  { year: 2025, cfb: "Indiana",        cbb: "Florida" },         // Indiana def. Miami 27–21 (Jan 2026) · Florida won Apr 2025
   { year: 2024, cfb: "Ohio State",     cbb: "Connecticut" },     // Ohio State CFP champ (Jan 2025) · UConn back-to-back
   { year: 2023, cfb: "Michigan",       cbb: "Connecticut" },
   { year: 2022, cfb: "Georgia",        cbb: "Kansas" },
   { year: 2021, cfb: "Georgia",        cbb: "Baylor" },
-  { year: 2020, cfb: "Alabama",        cbb: "Baylor" },          // 2020 CBB tourney cancelled; Baylor = 2021 season
+  { year: 2020, cfb: "Alabama",        cbb: CANCELLED },         // 2019–20 NCAA tourney cancelled (COVID-19)
   { year: 2019, cfb: "LSU",            cbb: "Virginia" },
   { year: 2018, cfb: "Clemson",        cbb: "Villanova" },
   { year: 2017, cfb: "Alabama",        cbb: "North Carolina" },
@@ -247,5 +257,3 @@ export const CHAMPIONS = [
   { year: 2014, cfb: "Ohio State",     cbb: "Connecticut" },
   { year: 2013, cfb: "Florida State",  cbb: "Louisville" },      // Louisville's 2013 title later vacated
 ];
-// Note on 2020: the 2019-20 NCAA basketball tournament was cancelled (COVID);
-// the ledger lists Baylor for the 2020-21 season alongside the 2020 CFB champ.

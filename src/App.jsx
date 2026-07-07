@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 import {
-  ERAS, FAMILIES, DEFAULT_WEIGHTS, ACTIVE, CONFS, CHAMPIONS, rawFor,
+  ERAS, FAMILIES, DEFAULT_WEIGHTS, ACTIVE, CONFS, CHAMPIONS, CANCELLED, rawFor,
 } from "./data.js";
 import {
   computeSportScore, blendBreakdown, tierFor, TIER_ORDER, TIER_META,
@@ -589,6 +589,7 @@ function HeatmapView({ C, ranked, sport, sortKey, setSortKey, sortDir, setSortDi
 function ChampionsView({ C, openByName }) {
   const Name = ({ name }) => {
     if (name == null) return <span style={{ color: C.faint, fontStyle: "italic" }}>awaiting result</span>;
+    if (name === CANCELLED) return <span style={{ color: C.faint, fontStyle: "italic" }}>not held — tournament cancelled</span>;
     const known = PROGRAM_BY_NAME[name];
     if (!known) return <span>{name}</span>;
     return (
@@ -599,7 +600,7 @@ function ChampionsView({ C, openByName }) {
   };
   const Cell = ({ Icon, name }) => (
     <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-      <span style={{ color: name == null ? C.faint : C.dim, display: "inline-flex", flexShrink: 0 }}><Icon size={16} /></span>
+      <span style={{ color: name == null || name === CANCELLED ? C.faint : C.dim, display: "inline-flex", flexShrink: 0 }}><Icon size={16} /></span>
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><Name name={name} /></span>
     </div>
   );
@@ -633,8 +634,9 @@ function ChampionsView({ C, openByName }) {
         })}
       </div>
       <div style={{ marginTop: 14, color: C.faint, fontSize: 10, lineHeight: 1.5 }}>
-        Note: the 2019–20 NCAA basketball tournament was cancelled (COVID-19); Baylor is listed for the 2020–21 season.
-        Champion names link to the program's Power Index profile where one exists.
+        Note: the 2019–20 NCAA basketball tournament was cancelled (COVID-19), so the 2020 season has no basketball
+        champion; Baylor's title belongs to the 2020–21 (2021) season. Ledger verified July 2026 against NCAA.com, ESPN,
+        and CFP.com. Champion names link to the program's Power Index profile where one exists.
       </div>
     </div>
   );
