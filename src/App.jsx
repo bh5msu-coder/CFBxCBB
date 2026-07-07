@@ -1,7 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
-import {
-  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
-} from "recharts";
+import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 import {
   ERAS, FAMILIES, DEFAULT_WEIGHTS, ACTIVE, CONFS, CHAMPIONS, rawFor,
 } from "./data.js";
@@ -11,8 +8,13 @@ import {
 import { THEMES, FONT_UI, FONT_MONO } from "./theme.js";
 import {
   IconLadder, IconQuadrant, IconGrid, IconTrophy, IconInfo, IconStar, IconFlag,
-  IconClose, IconReset, IconSun, IconMoon, IconDownload, IconFootball, IconBasketball,
+  IconClose, IconReset, IconSun, IconMoon, IconDownload, IconFootball, IconBasketball, IconCompare,
+  IconLink, IconCheck,
 } from "./icons.jsx";
+
+// Recharts is code-split into charts.jsx and only fetched when a chart view opens.
+const ScatterView = lazy(() => import("./charts.jsx").then((m) => ({ default: m.ScatterView })));
+const CompareChart = lazy(() => import("./charts.jsx").then((m) => ({ default: m.CompareChart })));
 
 const PROGRAM_BY_NAME = Object.fromEntries(ACTIVE.map((p) => [p.name, p]));
 
@@ -20,32 +22,87 @@ const VIEWS = [
   { key: "ladder", label: "Ladder", Icon: IconLadder },
   { key: "scatter", label: "Quadrant", Icon: IconQuadrant },
   { key: "heatmap", label: "Heatmap", Icon: IconGrid },
+  { key: "compare", label: "Compare", Icon: IconCompare },
   { key: "champions", label: "Champions", Icon: IconTrophy },
 ];
 
-const initialTheme = () => {
+const osTheme = () => {
   if (typeof window !== "undefined" && window.matchMedia) {
     return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   }
   return "dark";
 };
 
+// ---- Shareable / persisted state (URL hash mirrored to localStorage) --------
+const STORE_KEY = "cfbxcbb.state.v1";
+function readInitial() {
+  let str = "";
+  try {
+    const h = (typeof window !== "undefined" ? window.location.hash : "").replace(/^#/, "");
+    str = h || (typeof localStorage !== "undefined" ? localStorage.getItem(STORE_KEY) : "") || "";
+  } catch { /* ignore */ }
+  const q = new URLSearchParams(str);
+  const erasStr = q.get("e");
+  const selectedEras = {};
+  ERAS.forEach((e, i) => { selectedEras[e.key] = erasStr ? erasStr[i] === "1" : true; });
+  const weights = { ...DEFAULT_WEIGHTS };
+  const w = q.get("w");
+  if (w) { const parts = w.split("-").map(Number); FAMILIES.forEach((f, i) => { if (!Number.isNaN(parts[i])) weights[f.key] = parts[i]; }); }
+  const sp = q.get("sp");
+  return {
+    theme: q.get("th") === "light" || q.get("th") === "dark" ? q.get("th") : osTheme(),
+    view: q.get("v") || "ladder",
+    sport: q.get("s") || "combined",
+    recency: q.has("r") ? Math.max(0, Math.min(1, Number(q.get("r")) || 0)) : 0,
+    onField: q.get("on") === "1",
+    conf: q.get("c") || "All",
+    search: q.get("q") || "",
+    selectedEras, weights,
+    spotlight: sp ? sp.split(",").filter(Boolean) : [],
+  };
+}
+const INIT = readInitial();
+
 // ---------------------------------------------------------------------------
 export default function App() {
-  const [theme, setTheme] = useState(initialTheme);
-  const [view, setView] = useState("ladder");
-  const [sport, setSport] = useState("combined");
-  const [weights, setWeights] = useState({ ...DEFAULT_WEIGHTS });
-  const [selectedEras, setSelectedEras] = useState({ E1: true, E2: true, E3: true, E4: true });
-  const [recency, setRecency] = useState(0);
-  const [conf, setConf] = useState("All");
-  const [search, setSearch] = useState("");
-  const [spotlight, setSpotlight] = useState([]);
+  const [theme, setTheme] = useState(INIT.theme);
+  const [view, setView] = useState(INIT.view);
+  const [sport, setSport] = useState(INIT.sport);
+  const [weights, setWeights] = useState(INIT.weights);
+  const [selectedEras, setSelectedEras] = useState(INIT.selectedEras);
+  const [recency, setRecency] = useState(INIT.recency);
+  const [conf, setConf] = useState(INIT.conf);
+  const [search, setSearch] = useState(INIT.search);
+  const [spotlight, setSpotlight] = useState(INIT.spotlight);
   const [detail, setDetail] = useState(null);
-  const [onField, setOnField] = useState(false); // false = official (vacated removed)
+  const [onField, setOnField] = useState(INIT.onField); // false = official (vacated removed)
   const [showMethod, setShowMethod] = useState(false);
   const [sortKey, setSortKey] = useState("combined");
   const [sortDir, setSortDir] = useState("desc");
+  const [copied, setCopied] = useState(false);
+
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 1600); }
+    catch { /* clipboard unavailable */ }
+  };
+
+  // Mirror shareable state into the URL hash and localStorage on every change.
+  useEffect(() => {
+    const q = new URLSearchParams();
+    q.set("v", view); q.set("s", sport); q.set("th", theme);
+    if (recency) q.set("r", String(recency));
+    if (onField) q.set("on", "1");
+    if (conf !== "All") q.set("c", conf);
+    if (search) q.set("q", search);
+    q.set("e", ERAS.map((e) => (selectedEras[e.key] ? "1" : "0")).join(""));
+    q.set("w", FAMILIES.map((f) => weights[f.key]).join("-"));
+    if (spotlight.length) q.set("sp", spotlight.join(","));
+    const str = q.toString();
+    try {
+      localStorage.setItem(STORE_KEY, str);
+      history.replaceState(null, "", "#" + str);
+    } catch { /* ignore */ }
+  }, [view, sport, theme, recency, onField, conf, search, selectedEras, weights, spotlight]);
 
   const C = THEMES[theme];
   const anyEra = Object.values(selectedEras).some(Boolean);
@@ -135,6 +192,9 @@ export default function App() {
             </button>
           ))}
           <button className="btn" onClick={() => setShowMethod((s) => !s)} aria-expanded={showMethod}><IconInfo size={14} /> Methods</button>
+          <button className="btn" onClick={copyLink} aria-label="Copy shareable link to this view">
+            {copied ? <IconCheck size={14} /> : <IconLink size={14} />} {copied ? "Copied" : "Share"}
+          </button>
           <button className="btn icon" aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"} onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}>
             {theme === "dark" ? <IconSun size={15} /> : <IconMoon size={15} />}
           </button>
@@ -204,7 +264,7 @@ export default function App() {
         </aside>
 
         <main style={{ flex: 1, minWidth: 300 }}>
-          {view !== "champions" && (
+          {view !== "champions" && view !== "compare" && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10, marginBottom: 14 }}>
               <StatTile C={C} label="Programs ranked" value={kpis.count} />
               <StatTile C={C} label={`Top ${sport === "combined" ? "combined" : sport === "cfb" ? "football" : "basketball"}`}
@@ -217,12 +277,16 @@ export default function App() {
             <EmptyState C={C} title="No era selected" msg="Pick one or more era windows in the left rail to build the rankings." />
           ) : view === "champions" ? (
             <ChampionsView C={C} openByName={openByName} />
+          ) : view === "compare" ? (
+            <CompareView C={C} scored={scored} sport={sport} spotlight={spotlight} toggleSpotlight={toggleSpotlight} setDetail={setDetail} />
           ) : ranked.length === 0 && view !== "scatter" ? (
             <EmptyState C={C} title="No programs match" msg="Loosen the conference filter or clear the search to see results." />
           ) : view === "ladder" ? (
             <LadderView C={C} ranked={ranked} sport={sport} spotlight={spotlight} toggleSpotlight={toggleSpotlight} setDetail={setDetail} />
           ) : view === "scatter" ? (
-            <ScatterView C={C} scored={filtered} setDetail={setDetail} spotlight={spotlight} />
+            <Suspense fallback={<ChartFallback C={C} />}>
+              <ScatterView C={C} scored={filtered} setDetail={setDetail} spotlight={spotlight} />
+            </Suspense>
           ) : (
             <HeatmapView C={C} ranked={ranked} sport={sport} sortKey={sortKey} setSortKey={setSortKey} sortDir={sortDir} setSortDir={setSortDir} setDetail={setDetail} />
           )}
@@ -359,67 +423,81 @@ function LadderView({ C, ranked, sport, spotlight, toggleSpotlight, setDetail })
   );
 }
 
-// ----- SCATTER VIEW -----
-function ScatterView({ C, scored, setDetail, spotlight }) {
-  const data = scored.filter((p) => p.cfbScore != null && p.cbbScore != null).map((p) => ({
-    x: p.cfbScore, y: p.cbbScore, z: p.combined, name: p.name, conf: p.conf, vacated: p.vacated, raw: p,
-  }));
-  const Dot = (props) => {
-    const { cx, cy, payload } = props;
-    const spot = spotlight.includes(payload.name);
-    const r = 4 + (payload.z / 100) * 9;
-    return (
-      <g style={{ cursor: "pointer" }} tabIndex={0} role="button" aria-label={`${payload.name}. Football ${Math.round(payload.x)}, basketball ${Math.round(payload.y)}. Open details.`}
-        onClick={() => setDetail(payload.raw)}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetail(payload.raw); } }}>
-        <circle cx={cx} cy={cy} r={r} fill={spot ? C.accent : C.primary} fillOpacity={spot ? 0.9 : 0.45} stroke={spot ? C.accent : C.primary} strokeWidth={1.4} />
-        {(payload.z > 72 || spot) && <text x={cx} y={cy - r - 4} textAnchor="middle" fill={C.text} fontSize={9.5} fontFamily={FONT_MONO}>{payload.name}</text>}
-      </g>
-    );
-  };
+// ----- CHART FALLBACK (Suspense while the chart chunk loads) -----
+function ChartFallback({ C }) {
   return (
-    <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, boxShadow: C.shadow }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
-        <span style={{ fontWeight: 600, fontSize: 14 }}>Two-Sport Quadrant</span>
-        <span style={{ color: C.dim, fontSize: 10.5 }}>bubble = combined score · click a point to expand</span>
-      </div>
-      {data.length === 0 ? (
-        <EmptyState C={C} title="No two-sport programs" msg="This view needs programs with both football and basketball data. Clear filters to see them." />
-      ) : (
-        <div style={{ position: "relative" }}>
-          <div style={{ position: "absolute", top: 6, right: 10, color: C.accent, fontSize: 10, fontWeight: 600, zIndex: 1, opacity: 0.85 }}>TWO-SPORT BLUE BLOODS ↗</div>
-          <div style={{ position: "absolute", top: 6, left: 54, color: C.dim, fontSize: 10, zIndex: 1, opacity: 0.75 }}>↖ HOOPS SCHOOLS</div>
-          <div style={{ position: "absolute", bottom: 34, right: 10, color: C.dim, fontSize: 10, zIndex: 1, opacity: 0.75 }}>FOOTBALL SCHOOLS ↘</div>
-          <ResponsiveContainer width="100%" height={470}>
-            <ScatterChart margin={{ top: 20, right: 20, bottom: 30, left: 0 }}>
-              <CartesianGrid stroke={C.grid} />
-              <XAxis type="number" dataKey="x" domain={[15, 100]} name="CFB" tick={{ fill: C.dim, fontSize: 10 }} stroke={C.border}
-                label={{ value: "FOOTBALL SCORE →", position: "bottom", fill: C.dim, fontSize: 10 }} />
-              <YAxis type="number" dataKey="y" domain={[15, 100]} name="CBB" tick={{ fill: C.dim, fontSize: 10 }} stroke={C.border}
-                label={{ value: "BASKETBALL SCORE →", angle: -90, position: "insideLeft", fill: C.dim, fontSize: 10 }} />
-              <ReferenceLine x={60} stroke={C.border} strokeDasharray="3 3" />
-              <ReferenceLine y={60} stroke={C.border} strokeDasharray="3 3" />
-              <Tooltip cursor={{ strokeDasharray: "3 3", stroke: C.primary }}
-                content={({ active, payload }) => {
-                  if (!active || !payload?.length) return null;
-                  const d = payload[0].payload;
-                  const rf = rawFor(d.name, "cfb"); const rb = rawFor(d.name, "cbb");
-                  const note = (rf && (rf.champ || rf.winpct)) || (rb && (rb.champ || rb.winpct)) || null;
-                  return (
-                    <div style={{ background: C.panel2, border: `1px solid ${C.primary}`, borderRadius: 8, padding: 10, fontSize: 11.5, fontFamily: FONT_UI, maxWidth: 230, boxShadow: C.shadow }}>
-                      <div style={{ fontWeight: 700, color: C.text, display: "flex", alignItems: "center", gap: 5 }}>{d.name} {d.vacated && <span style={{ color: C.accent, display: "inline-flex" }}><IconFlag size={11} /></span>}</div>
-                      <div style={{ color: C.dim }}>{d.conf}</div>
-                      <div style={{ color: C.primary, fontFamily: FONT_MONO, marginTop: 3 }}>CFB {Math.round(d.x)} · CBB {Math.round(d.y)}</div>
-                      <div style={{ color: C.accent, fontFamily: FONT_MONO }}>Combined {Math.round(d.z)}</div>
-                      {note && <div style={{ color: C.text, fontStyle: "italic", marginTop: 5, fontSize: 10.5, lineHeight: 1.4 }}>{note}</div>}
-                    </div>
-                  );
-                }} />
-              <Scatter data={data} shape={<Dot />} isAnimationActive={false} />
-            </ScatterChart>
-          </ResponsiveContainer>
+    <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, height: 470, display: "flex", alignItems: "center", justifyContent: "center", color: C.dim, fontSize: 12.5, boxShadow: C.shadow }}>
+      Loading chart…
+    </div>
+  );
+}
+
+// ----- COMPARE VIEW -----
+function CompareView({ C, scored, sport, spotlight, toggleSpotlight, setDetail }) {
+  const breakKey = sport === "cbb" ? "cbbBreak" : sport === "combined" ? "combBreak" : "cfbBreak";
+  const chosen = scored.filter((p) => spotlight.includes(p.name)).slice(0, 5);
+  if (chosen.length < 2) {
+    return <EmptyState C={C} title="Pick programs to compare"
+      msg="Star 2–5 programs (the ☆ on any Ladder card or Heatmap row) to see them head-to-head across all six metric families." />;
+  }
+  const SERIES = ["#5b9bff", "#f5b301", "#10b981", "#8b5cf6", "#ef4444"];
+  const sportLabel = sport === "combined" ? "blended" : sport === "cbb" ? "basketball" : "football";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, boxShadow: C.shadow }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+          <span style={{ fontWeight: 600, fontSize: 14 }}>Head-to-Head — {sportLabel} profile</span>
+          <span style={{ color: C.dim, fontSize: 10.5 }}>{chosen.length} of up to 5 · star more to add</span>
         </div>
-      )}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+          {chosen.map((p, i) => (
+            <button key={p.name} className="btn small" onClick={() => toggleSpotlight(p.name)} aria-label={`Remove ${p.name} from comparison`}
+              style={{ borderColor: SERIES[i % SERIES.length], color: C.text }}>
+              <span style={{ width: 9, height: 9, borderRadius: 2, background: SERIES[i % SERIES.length], display: "inline-block" }} />
+              {p.name} <IconClose size={11} />
+            </button>
+          ))}
+        </div>
+        <Suspense fallback={<ChartFallback C={C} />}>
+          <CompareChart C={C} programs={chosen} breakKey={breakKey} />
+        </Suspense>
+      </div>
+
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 6, overflowX: "auto", boxShadow: C.shadow }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 480, fontFamily: FONT_MONO }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+              <th style={{ textAlign: "left", padding: "9px 8px", color: C.dim, fontSize: 10.5, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.4 }}>Metric</th>
+              {chosen.map((p, i) => (
+                <th key={p.name} style={{ padding: "9px 6px", fontSize: 11.5, fontFamily: FONT_UI, color: SERIES[i % SERIES.length], textAlign: "center" }}>
+                  <button onClick={() => setDetail(p)} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontFamily: "inherit", fontSize: "inherit", fontWeight: 600 }}>{p.name}</button>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+              <td style={{ padding: "8px", fontWeight: 700, fontFamily: FONT_UI, fontSize: 12 }}>Score ({sportLabel})</td>
+              {chosen.map((p) => {
+                const v = sport === "combined" ? p.combined : sport === "cfb" ? p.cfbScore : p.cbbScore;
+                return <td key={p.name} style={{ padding: 6, textAlign: "center", fontWeight: 700, fontSize: 14, color: TIER_META[tierFor(v)]?.color, fontVariantNumeric: "tabular-nums" }}>{v == null ? "—" : Math.round(v)}</td>;
+              })}
+            </tr>
+            {FAMILIES.map((f) => (
+              <tr key={f.key} style={{ borderBottom: `1px solid ${C.grid}` }}>
+                <td style={{ padding: "8px", color: C.dim, fontFamily: FONT_UI, fontSize: 12 }}>{f.label}</td>
+                {chosen.map((p) => {
+                  const v = p[breakKey]?.[f.key];
+                  const best = Math.max(...chosen.map((q) => q[breakKey]?.[f.key] ?? -1));
+                  const isBest = v != null && v === best && chosen.length > 1;
+                  return <td key={p.name} style={{ padding: 6, textAlign: "center", fontVariantNumeric: "tabular-nums", color: v == null ? C.faint : C.text, fontWeight: isBest ? 700 : 400, background: isBest ? `${C.accent}1f` : "transparent" }}>{v == null ? "—" : Math.round(v)}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{ padding: "6px 8px", color: C.faint, fontSize: 9.5 }}>Best value in each row is highlighted. Click a program name for its full breakdown.</div>
+      </div>
     </div>
   );
 }
