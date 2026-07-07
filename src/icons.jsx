@@ -23,6 +23,9 @@ export const IconMoon = (p) => (<Svg {...p}><path d="M21 12.8A9 9 0 1 1 11.2 3a7
 export const IconDownload = (p) => (<Svg {...p}><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></Svg>);
 export const IconFootball = (p) => (<Svg {...p}><path d="M4 12c0-4 4-8 8-8s8 4 8 8-4 8-8 8-8-4-8-8Z"/><path d="M9 9l6 6M15 9l-6 6"/></Svg>);
 export const IconBasketball = (p) => (<Svg {...p}><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.6 5.6c3 3 3 9.8 0 12.8M18.4 5.6c-3 3-3 9.8 0 12.8"/></Svg>);
+export const IconLink = (p) => (<Svg {...p}><path d="M9 15l6-6"/><path d="M10.5 6.5l1-1a4 4 0 0 1 6 6l-1 1"/><path d="M13.5 17.5l-1 1a4 4 0 0 1-6-6l1-1"/></Svg>);
+export const IconCheck = (p) => (<Svg {...p}><polyline points="4 12 10 18 20 6"/></Svg>);
+export const IconCompare = (p) => (<Svg {...p}><path d="M3 6h7M3 12h7M3 18h7"/><path d="M14 6h7M14 12h7M14 18h7"/><circle cx="10" cy="6" r="1.6"/><circle cx="14" cy="12" r="1.6"/><circle cx="10" cy="18" r="1.6"/></Svg>);
 export const IconChevron = ({ dir = "down", ...p }) => (
   <Svg {...p} style={{ transform: dir === "up" ? "rotate(180deg)" : "none", ...(p.style || {}) }}>
     <polyline points="6 9 12 15 18 9"/>
