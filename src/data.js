@@ -242,6 +242,7 @@ export const CONFS = ["All", ...Array.from(new Set(ACTIVE.map((p) => p.conf))).s
 export const CANCELLED = "__cancelled__"; // season with no championship held
 
 export const CHAMPIONS = [
+  { year: 2027, cfb: null,             cbb: null },              // awaiting: CFP title Jan 2028 · NCAA tourney Apr 2027
   { year: 2026, cfb: null,             cbb: "Michigan" },        // CFP title game Jan 2027 pending · Michigan won Apr 2026
   { year: 2025, cfb: "Indiana",        cbb: "Florida" },         // Indiana def. Miami 27–21 (Jan 2026) · Florida won Apr 2025
   { year: 2024, cfb: "Ohio State",     cbb: "Connecticut" },     // Ohio State CFP champ (Jan 2025) · UConn back-to-back
