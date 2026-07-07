@@ -234,10 +234,15 @@ export const CONFS = ["All", ...Array.from(new Set(ACTIVE.map((p) => p.conf))).s
 //   TO ADD A FUTURE SEASON: add/replace a row below with the champion's name.
 //   Names should match a program in PROGRAMS to get a clickable cross-link.
 //
-// Ledger verified July 2026 against NCAA.com, ESPN, and CFP.com:
+// Coverage spans the full model window (1976–present). Football champion =
+// BCS/CFP title-game winner from 1998 on, and the final AP-poll #1 before that;
+// split-poll seasons (1978, 1990, 1991, 1997, 2003) list the AP/BCS champion
+// with the co-champion noted inline. Basketball = NCAA tournament winner.
+// Verified July 2026 against NCAA.com, ESPN, CFP.com and final AP polls:
 //   · 2025 CFB — Indiana def. Miami (FL) 27–21 (Jan 19, 2026), first-ever title.
 //   · 2026 CBB — Michigan def. UConn 69–63 (Apr 6, 2026), first title since 1989.
 //   · 2020 CBB — no champion; the 2019–20 NCAA tournament was cancelled (COVID-19).
+//   · 1976 CFB — Pittsburgh (12–0), NOT Michigan (a common auto-generated error).
 // ---------------------------------------------------------------------------
 export const CANCELLED = "__cancelled__"; // season with no championship held
 
@@ -257,4 +262,43 @@ export const CHAMPIONS = [
   { year: 2015, cfb: "Alabama",        cbb: "Duke" },
   { year: 2014, cfb: "Ohio State",     cbb: "Connecticut" },
   { year: 2013, cfb: "Florida State",  cbb: "Louisville" },      // Louisville's 2013 title later vacated
+  // ----- BCS era (football champion = BCS title game winner) -----
+  { year: 2012, cfb: "Alabama",        cbb: "Kentucky" },
+  { year: 2011, cfb: "Alabama",        cbb: "Connecticut" },
+  { year: 2010, cfb: "Auburn",         cbb: "Duke" },
+  { year: 2009, cfb: "Alabama",        cbb: "North Carolina" },
+  { year: 2008, cfb: "Florida",        cbb: "Kansas" },
+  { year: 2007, cfb: "LSU",            cbb: "Florida" },
+  { year: 2006, cfb: "Florida",        cbb: "Florida" },         // Florida won both titles in 2006–07
+  { year: 2005, cfb: "Texas",          cbb: "North Carolina" },
+  { year: 2004, cfb: "USC",            cbb: "Connecticut" },     // USC's BCS title later vacated (Bush case)
+  { year: 2003, cfb: "LSU",            cbb: "Syracuse" },        // split CFB: LSU (BCS) / USC (AP)
+  { year: 2002, cfb: "Ohio State",     cbb: "Maryland" },
+  { year: 2001, cfb: "Miami (FL)",     cbb: "Duke" },
+  { year: 2000, cfb: "Oklahoma",       cbb: "Michigan State" },
+  { year: 1999, cfb: "Florida State",  cbb: "Connecticut" },
+  { year: 1998, cfb: "Tennessee",      cbb: "Kentucky" },
+  // ----- Pre-BCS (football champion = final AP poll #1) -----
+  { year: 1997, cfb: "Michigan",       cbb: "Arizona" },         // split CFB: Michigan (AP) / Nebraska (Coaches)
+  { year: 1996, cfb: "Florida",        cbb: "Kentucky" },
+  { year: 1995, cfb: "Nebraska",       cbb: "UCLA" },
+  { year: 1994, cfb: "Nebraska",       cbb: "Arkansas" },        // Arkansas: not a rated program (renders as plain text)
+  { year: 1993, cfb: "Florida State",  cbb: "North Carolina" },
+  { year: 1992, cfb: "Alabama",        cbb: "Duke" },
+  { year: 1991, cfb: "Miami (FL)",     cbb: "Duke" },            // split CFB: Miami (AP) / Washington (Coaches)
+  { year: 1990, cfb: "Colorado",       cbb: "UNLV" },            // split CFB: Colorado (AP) / Georgia Tech (UPI)
+  { year: 1989, cfb: "Miami (FL)",     cbb: "Michigan" },
+  { year: 1988, cfb: "Notre Dame",     cbb: "Kansas" },
+  { year: 1987, cfb: "Miami (FL)",     cbb: "Indiana" },
+  { year: 1986, cfb: "Penn State",     cbb: "Louisville" },
+  { year: 1985, cfb: "Oklahoma",       cbb: "Villanova" },
+  { year: 1984, cfb: "BYU",            cbb: "Georgetown" },
+  { year: 1983, cfb: "Miami (FL)",     cbb: "NC State" },
+  { year: 1982, cfb: "Penn State",     cbb: "North Carolina" },
+  { year: 1981, cfb: "Clemson",        cbb: "Indiana" },
+  { year: 1980, cfb: "Georgia",        cbb: "Louisville" },
+  { year: 1979, cfb: "Alabama",        cbb: "Michigan State" },
+  { year: 1978, cfb: "Alabama",        cbb: "Kentucky" },        // split CFB: Alabama (AP) / USC (Coaches)
+  { year: 1977, cfb: "Notre Dame",     cbb: "Marquette" },
+  { year: 1976, cfb: "Pittsburgh",     cbb: "Indiana" },         // Pitt 12–0 (Dorsett) · Indiana's last unbeaten title
 ];

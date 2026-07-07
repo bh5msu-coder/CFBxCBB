@@ -611,9 +611,9 @@ function ChampionsView({ C, openByName }) {
         <span style={{ color: C.dim, fontSize: 10.5 }}>appendable · add each title as it becomes official</span>
       </div>
       <div style={{ color: C.dim, fontSize: 11.5, lineHeight: 1.5, marginBottom: 14, maxWidth: 640 }}>
-        The forward-looking record. Each row is a season; football is the College Football Playoff / BCS champion,
-        basketball the NCAA tournament champion. Rows awaiting a decided title are highlighted — that is where the next
-        season plugs in.
+        The full-window record, 1976 to today. Each row is a season; football is the CFP / BCS champion (final AP #1
+        before 1998), basketball the NCAA tournament champion. Rows awaiting a decided title are highlighted — that is
+        where the next season plugs in.
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "56px 1fr 1fr", gap: 0, fontSize: 12.5 }}>
         <div style={{ color: C.dim, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, padding: "0 0 8px" }}>Season</div>
@@ -635,8 +635,9 @@ function ChampionsView({ C, openByName }) {
       </div>
       <div style={{ marginTop: 14, color: C.faint, fontSize: 10, lineHeight: 1.5 }}>
         Note: the 2019–20 NCAA basketball tournament was cancelled (COVID-19), so the 2020 season has no basketball
-        champion; Baylor's title belongs to the 2020–21 (2021) season. Ledger verified July 2026 against NCAA.com, ESPN,
-        and CFP.com. Champion names link to the program's Power Index profile where one exists.
+        champion; Baylor's title belongs to the 2020–21 (2021) season. Split-poll football seasons (1978, 1990, 1991,
+        1997, 2003) list the AP/BCS champion. Ledger verified July 2026 against NCAA.com, ESPN, CFP.com and final AP
+        polls. Champion names link to the program's Power Index profile where one exists.
       </div>
     </div>
   );

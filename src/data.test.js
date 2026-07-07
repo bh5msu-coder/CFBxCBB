@@ -28,6 +28,15 @@ describe("CHAMPIONS ledger integrity", () => {
     expect(baylorYears).toEqual([2021]);
   });
 
+  it("spans the full 1976–present model window", () => {
+    const years = CHAMPIONS.map((r) => r.year);
+    expect(Math.min(...years)).toBe(1976);
+    expect(byYear[1976].cfb).toBe("Pittsburgh");   // NOT Michigan — verified
+    expect(byYear[1976].cbb).toBe("Indiana");
+    expect(byYear[1983].cbb).toBe("NC State");     // program name matches PROGRAMS
+    expect(byYear[2004].cfb).toBe("USC");          // BCS title later vacated
+  });
+
   it("uses only future/awaiting (null) or CANCELLED as non-name values", () => {
     for (const row of CHAMPIONS) {
       for (const v of [row.cfb, row.cbb]) {
@@ -37,10 +46,16 @@ describe("CHAMPIONS ledger integrity", () => {
     }
   });
 
-  it("every named champion resolves to a known program (clickable cross-link)", () => {
+  // Champions that intentionally aren't rated programs — they render as plain
+  // text (no cross-link), which is valid. Kept explicit so a typo in any OTHER
+  // champion name still fails the guard below.
+  const KNOWN_NON_PROGRAM = new Set(["Arkansas"]);
+
+  it("every named champion is a rated program (cross-link) or a known exception", () => {
     for (const row of CHAMPIONS) {
       for (const v of [row.cfb, row.cbb]) {
         if (v == null || v === CANCELLED) continue;
+        if (KNOWN_NON_PROGRAM.has(v)) continue;
         expect(NAMES.has(v), `${v} missing from PROGRAMS`).toBe(true);
       }
     }
