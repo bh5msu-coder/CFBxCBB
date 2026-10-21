@@ -26,6 +26,7 @@ export const IconBasketball = (p) => (<Svg {...p}><circle cx="12" cy="12" r="9"/
 export const IconLink = (p) => (<Svg {...p}><path d="M9 15l6-6"/><path d="M10.5 6.5l1-1a4 4 0 0 1 6 6l-1 1"/><path d="M13.5 17.5l-1 1a4 4 0 0 1-6-6l1-1"/></Svg>);
 export const IconCheck = (p) => (<Svg {...p}><polyline points="4 12 10 18 20 6"/></Svg>);
 export const IconCompare = (p) => (<Svg {...p}><path d="M3 6h7M3 12h7M3 18h7"/><path d="M14 6h7M14 12h7M14 18h7"/><circle cx="10" cy="6" r="1.6"/><circle cx="14" cy="12" r="1.6"/><circle cx="10" cy="18" r="1.6"/></Svg>);
+export const IconTable = (p) => (<Svg {...p}><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="14" x2="21" y2="14"/><line x1="10" y1="9" x2="10" y2="20"/></Svg>);
 export const IconChevron = ({ dir = "down", ...p }) => (
   <Svg {...p} style={{ transform: dir === "up" ? "rotate(180deg)" : "none", ...(p.style || {}) }}>
     <polyline points="6 9 12 15 18 9"/>

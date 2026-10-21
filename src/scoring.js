@@ -62,6 +62,21 @@ export function blendBreakdown(cfbBreak, cbbBreak) {
   return out;
 }
 
+// Per-family point contribution to the weighted composite. Each family's share
+// is value × weight / Σ(weights of non-null families), so the contributions sum
+// exactly to computeSportScore's score — letting the UI show how the number is
+// built instead of asking users to take it on faith.
+export function contributions(breakdown, weights) {
+  let wsum = 0;
+  FAMILIES.forEach((f) => { if (breakdown?.[f.key] != null) wsum += weights[f.key]; });
+  const out = {};
+  FAMILIES.forEach((f) => {
+    const v = breakdown?.[f.key];
+    out[f.key] = v == null || wsum === 0 ? null : (v * weights[f.key]) / wsum;
+  });
+  return out;
+}
+
 export function tierFor(score) {
   if (score == null) return null;
   if (score >= 82) return "Blue Blood";

@@ -1,15 +1,16 @@
 import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 import {
   ERAS, FAMILIES, DEFAULT_WEIGHTS, ACTIVE, CONFS, CHAMPIONS, CANCELLED, rawFor,
+  FAMILY_CONFIDENCE, CONFIDENCE, ERA_CONFIDENCE, TITLES, titlesFor, titleTotal,
 } from "./data.js";
 import {
-  computeSportScore, blendBreakdown, tierFor, TIER_ORDER, TIER_META,
+  computeSportScore, blendBreakdown, contributions, tierFor, TIER_ORDER, TIER_META,
 } from "./scoring.js";
 import { THEMES, FONT_UI, FONT_MONO } from "./theme.js";
 import {
   IconLadder, IconQuadrant, IconGrid, IconTrophy, IconInfo, IconStar, IconFlag,
   IconClose, IconReset, IconSun, IconMoon, IconDownload, IconFootball, IconBasketball, IconCompare,
-  IconLink, IconCheck,
+  IconLink, IconCheck, IconTable,
 } from "./icons.jsx";
 
 // Recharts is code-split into charts.jsx and only fetched when a chart view opens.
@@ -20,11 +21,39 @@ const PROGRAM_BY_NAME = Object.fromEntries(ACTIVE.map((p) => [p.name, p]));
 
 const VIEWS = [
   { key: "ladder", label: "Ladder", Icon: IconLadder },
+  { key: "board", label: "Board", Icon: IconTable },
   { key: "scatter", label: "Quadrant", Icon: IconQuadrant },
   { key: "heatmap", label: "Heatmap", Icon: IconGrid },
   { key: "compare", label: "Compare", Icon: IconCompare },
   { key: "champions", label: "Champions", Icon: IconTrophy },
 ];
+
+// Small, non-color-only confidence badge used across the detail modal, board
+// and legend. Letter + title keeps meaning for colorblind readers.
+function ConfBadge({ level, size = 13 }) {
+  const c = CONFIDENCE[level];
+  if (!c) return null;
+  return (
+    <span title={`${c.label}: ${c.note}`} aria-label={c.label}
+      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: size, height: size, borderRadius: 3, fontSize: size - 4, fontWeight: 700, lineHeight: 1, color: "#07101f", background: c.color, fontFamily: FONT_MONO, flexShrink: 0 }}>
+      {c.badge}
+    </span>
+  );
+}
+
+// Compact "🏈n 🏀m" title badge sourced from the ledger tally.
+function TitleBadge({ C, name, muted }) {
+  const t = titlesFor(name);
+  if (!t.cfb.length && !t.cbb.length) return <span style={{ color: C.faint }}>—</span>;
+  const col = muted ? C.dim : C.text;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: FONT_MONO, fontVariantNumeric: "tabular-nums", color: col }}
+      title={`National titles in window (1976–present)${t.cfb.length ? ` · football ${t.cfb.join(", ")}` : ""}${t.cbb.length ? ` · basketball ${t.cbb.join(", ")}` : ""}`}>
+      {t.cfb.length > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><IconFootball size={11} />{t.cfb.length}</span>}
+      {t.cbb.length > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><IconBasketball size={11} />{t.cbb.length}</span>}
+    </span>
+  );
+}
 
 const osTheme = () => {
   if (typeof window !== "undefined" && window.matchMedia) {
@@ -222,6 +251,14 @@ export default function App() {
                   onClick={() => setSelectedEras((s) => ({ ...s, [e.key]: !s[e.key] }))}>{e.label}</button>
               ))}
             </div>
+            <div style={{ display: "flex", gap: 9, alignItems: "center", marginTop: 8, flexWrap: "wrap", fontSize: 9.5, color: C.faint }}>
+              <span style={{ textTransform: "uppercase", letterSpacing: 0.4 }}>confidence</span>
+              {ERAS.map((e) => (
+                <span key={e.key} title={`${e.label}: ${CONFIDENCE[ERA_CONFIDENCE[e.key]].label}`} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                  <ConfBadge level={ERA_CONFIDENCE[e.key]} size={10} /> {e.label}
+                </span>
+              ))}
+            </div>
             {!anyEra && <div style={{ color: C.accent, fontSize: 10.5, marginTop: 8 }}>Select at least one era to see rankings.</div>}
             <div style={{ marginTop: 12 }}>
               <Label C={C} l="Recency weighting" v={recency === 0 ? "equal" : `+${recency.toFixed(1)}`} />
@@ -283,6 +320,8 @@ export default function App() {
             <EmptyState C={C} title="No programs match" msg="Loosen the conference filter or clear the search to see results." />
           ) : view === "ladder" ? (
             <LadderView C={C} ranked={ranked} sport={sport} spotlight={spotlight} toggleSpotlight={toggleSpotlight} setDetail={setDetail} />
+          ) : view === "board" ? (
+            <BoardView C={C} ranked={ranked} sport={sport} spotlight={spotlight} toggleSpotlight={toggleSpotlight} setDetail={setDetail} />
           ) : view === "scatter" ? (
             <Suspense fallback={<ChartFallback C={C} />}>
               <ScatterView C={C} scored={filtered} setDetail={setDetail} spotlight={spotlight} />
@@ -296,9 +335,9 @@ export default function App() {
       {detail && <DetailModal C={C} prog={detail} close={() => setDetail(null)} weights={weights} onField={onField} />}
 
       <footer style={{ marginTop: 22, paddingTop: 12, borderTop: `1px solid ${C.border}`, color: C.dim, fontSize: 10.5, lineHeight: 1.55 }}>
-        Championships, Final Fours &amp; the season title ledger are high-confidence. Recruiting / poll-weeks / advanced / pro / era-split win% are{" "}
-        <span style={{ color: C.accent }}>calibrated analyst estimates on a relative 0–100 scale</span> — not exact sourced season figures.
-        Open Methods for full notes. Vacated programs flagged with a pennant.
+        Championships, Final Fours &amp; the season title ledger are high-confidence. Poll Presence ordering is{" "}
+        <span style={{ color: C.primary }}>anchored to sourced all-time AP totals</span> (era split estimated); recruiting / advanced / pro / era-split win% are{" "}
+        <span style={{ color: C.accent }}>calibrated analyst estimates on a relative 0–100 scale</span>. Open Methods for full notes &amp; the confidence key. Vacated programs flagged with a pennant.
       </footer>
     </div>
   );
@@ -419,6 +458,104 @@ function LadderView({ C, ranked, sport, spotlight, toggleSpotlight, setDetail })
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ----- BOARD VIEW (sortable standings table) -----
+function BoardView({ C, ranked, sport, spotlight, toggleSpotlight, setDetail }) {
+  const [sk, setSk] = useState("active");
+  const [sd, setSd] = useState("desc");
+  const scoreLabel = sport === "combined" ? "Combined" : sport === "cfb" ? "Football" : "Basketball";
+
+  const sortBy = (k) => {
+    if (sk === k) setSd((d) => (d === "desc" ? "asc" : "desc"));
+    else { setSk(k); setSd(k === "name" || k === "conf" ? "asc" : "desc"); }
+  };
+  const rows = useMemo(() => {
+    const dir = sd === "desc" ? -1 : 1;
+    const val = (p) => {
+      switch (sk) {
+        case "name": return p.name;
+        case "conf": return p.conf;
+        case "cfb": return p.cfbScore ?? -1;
+        case "cbb": return p.cbbScore ?? -1;
+        case "titles": return titleTotal(p.name);
+        default: return p.active ?? -1;
+      }
+    };
+    return [...ranked].sort((a, b) => {
+      const av = val(a), bv = val(b);
+      if (typeof av === "string") return av.localeCompare(bv) * dir;
+      if (av === bv) return b.active - a.active; // stable-ish tiebreak on power
+      return (av - bv) * dir;
+    });
+  }, [ranked, sk, sd]);
+
+  const ariaSort = (k) => (sk === k ? (sd === "desc" ? "descending" : "ascending") : "none");
+  const Th = ({ k, label, left }) => (
+    <th aria-sort={ariaSort(k)} style={{ padding: 0 }}>
+      <button onClick={() => sortBy(k)}
+        style={{ width: "100%", background: "none", border: "none", cursor: "pointer", color: sk === k ? C.primary : C.dim, fontSize: 10.5, fontWeight: 700, textAlign: left ? "left" : "center", padding: "9px 8px", fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.4 }}>
+        {label}{sk === k ? (sd === "desc" ? " ▾" : " ▴") : ""}
+      </button>
+    </th>
+  );
+
+  return (
+    <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 6, overflowX: "auto", boxShadow: C.shadow }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 8px 0", color: C.faint, fontSize: 10, gap: 8, flexWrap: "wrap" }}>
+        <span>the whole field, ranked — click any header to re-sort</span>
+        <span>{rows.length} programs · titles from the 1976–present ledger</span>
+      </div>
+      <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 560, fontFamily: FONT_MONO }}>
+        <thead>
+          <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+            <th style={{ padding: "9px 6px", color: C.dim, fontSize: 10.5, textAlign: "center", width: 30 }}>#</th>
+            <th style={{ width: 28 }} aria-label="spotlight" />
+            <Th k="name" label="Program" left />
+            <Th k="conf" label="Conf" left />
+            <Th k="active" label={scoreLabel} />
+            <Th k="cfb" label="CFB" />
+            <Th k="cbb" label="CBB" />
+            <Th k="titles" label="Titles" />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((p, i) => {
+            const spot = spotlight.includes(p.name);
+            const tier = tierFor(p.active);
+            return (
+              <tr key={p.name} className="row" role="button" tabIndex={0}
+                aria-label={`${p.name}, ${tier}, ${scoreLabel} ${Math.round(p.active)}. Open details.`}
+                onClick={() => setDetail(p)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetail(p); } }}
+                style={{ cursor: "pointer", borderBottom: `1px solid ${C.grid}`, background: spot ? C.panel2 : "transparent" }}>
+                <td style={{ padding: 6, color: C.dim, fontSize: 11, textAlign: "center", fontVariantNumeric: "tabular-nums" }}>{i + 1}</td>
+                <td style={{ padding: "0 2px", textAlign: "center" }}>
+                  <button className={`btn small ${spot ? "on" : ""}`} aria-label={`${spot ? "Remove" : "Add"} ${p.name} spotlight`} aria-pressed={spot}
+                    style={{ padding: 4, borderColor: spot ? C.accent : "transparent", background: spot ? undefined : "transparent" }}
+                    onClick={(e) => { e.stopPropagation(); toggleSpotlight(p.name); }}>
+                    <IconStar size={12} filled={spot} />
+                  </button>
+                </td>
+                <td style={{ padding: "6px 8px", fontWeight: 600, fontSize: 12.5, whiteSpace: "nowrap", fontFamily: FONT_UI }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 2, background: TIER_META[tier]?.color, flexShrink: 0 }} title={tier} />
+                    {p.name}
+                    {p.vacated && <span title="Has NCAA-vacated results" style={{ color: C.accent, display: "inline-flex" }}><IconFlag size={11} /></span>}
+                  </span>
+                </td>
+                <td style={{ padding: "6px 8px", color: C.dim, fontSize: 11, fontFamily: FONT_UI, whiteSpace: "nowrap" }}>{p.conf}</td>
+                <td style={{ padding: 6, textAlign: "center", fontWeight: 700, color: TIER_META[tier]?.color, fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{Math.round(p.active)}</td>
+                <td style={{ padding: 6, textAlign: "center", color: p.cfbScore == null ? C.faint : C.text, fontVariantNumeric: "tabular-nums" }}>{p.cfbScore == null ? "—" : Math.round(p.cfbScore)}</td>
+                <td style={{ padding: 6, textAlign: "center", color: p.cbbScore == null ? C.faint : C.text, fontVariantNumeric: "tabular-nums" }}>{p.cbbScore == null ? "—" : Math.round(p.cbbScore)}</td>
+                <td style={{ padding: "6px 8px", textAlign: "center" }}><TitleBadge C={C} name={p.name} /></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -587,6 +724,12 @@ function HeatmapView({ C, ranked, sport, sortKey, setSortKey, sortDir, setSortDi
 
 // ----- CHAMPIONS VIEW -----
 function ChampionsView({ C, openByName }) {
+  const leaders = useMemo(() =>
+    Object.entries(TITLES)
+      .map(([name, t]) => ({ name, cfb: t.cfb.length, cbb: t.cbb.length, total: t.cfb.length + t.cbb.length }))
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
+      .slice(0, 8), []);
+  const maxTotal = leaders[0]?.total || 1;
   const Name = ({ name }) => {
     if (name == null) return <span style={{ color: C.faint, fontStyle: "italic" }}>awaiting result</span>;
     if (name === CANCELLED) return <span style={{ color: C.faint, fontStyle: "italic" }}>not held — tournament cancelled</span>;
@@ -615,6 +758,40 @@ function ChampionsView({ C, openByName }) {
         before 1998), basketball the NCAA tournament champion. Rows awaiting a decided title are highlighted — that is
         where the next season plugs in.
       </div>
+
+      <div style={{ background: C.panel2, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 14px", marginBottom: 16 }}>
+        <div style={{ color: C.dim, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+          Most titles in window · 1976–present
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(170px,1fr))", gap: 8 }}>
+          {leaders.map((l, i) => {
+            const known = PROGRAM_BY_NAME[l.name];
+            return (
+              <div key={l.name} role={known ? "button" : undefined} tabIndex={known ? 0 : undefined}
+                onClick={known ? () => openByName(l.name) : undefined}
+                onKeyDown={known ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openByName(l.name); } } : undefined}
+                className={known ? "row" : undefined}
+                style={{ display: "flex", alignItems: "center", gap: 9, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 10px", cursor: known ? "pointer" : "default" }}>
+                <span style={{ color: C.faint, fontFamily: FONT_MONO, fontSize: 11, width: 16, textAlign: "right" }}>{i + 1}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 12.5, color: known ? C.primary : C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</div>
+                  <div style={{ height: 4, background: C.grid, borderRadius: 3, marginTop: 4, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(l.total / maxTotal) * 100}%`, background: C.accent, borderRadius: 3 }} />
+                  </div>
+                </div>
+                <span style={{ fontFamily: FONT_MONO, fontVariantNumeric: "tabular-nums", display: "inline-flex", gap: 7, color: C.dim, fontSize: 11 }}>
+                  {l.cfb > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}><IconFootball size={11} />{l.cfb}</span>}
+                  {l.cbb > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}><IconBasketball size={11} />{l.cbb}</span>}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ color: C.faint, fontSize: 9.5, marginTop: 9, lineHeight: 1.5 }}>
+          Counts decided championships in the ledger (on-field basis — vacated titles like Louisville 2013 &amp; USC 2004 are included and flagged on the program).
+        </div>
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "56px 1fr 1fr", gap: 0, fontSize: 12.5 }}>
         <div style={{ color: C.dim, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, padding: "0 0 8px" }}>Season</div>
         <div style={{ color: C.dim, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, padding: "0 0 8px", display: "flex", alignItems: "center", gap: 6 }}><IconFootball size={13} /> Football</div>
@@ -653,11 +830,19 @@ function DetailModal({ C, prog, close, weights, onField }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [close]);
 
-  const Bar = ({ label, val, w, raw }) => (
+  const tt = titlesFor(prog.name);
+  const Bar = ({ fkey, label, val, w, raw, contrib }) => (
     <div style={{ marginBottom: 9 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginBottom: 3 }}>
-        <span style={{ color: C.dim }}>{label} <span style={{ color: C.accent, fontSize: 9.5, fontFamily: FONT_MONO }}>·w{w}</span></span>
-        <span style={{ fontWeight: 700, fontFamily: FONT_MONO, fontVariantNumeric: "tabular-nums" }}>{val == null ? "—" : Math.round(val)}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5, marginBottom: 3, gap: 8 }}>
+        <span style={{ color: C.dim, display: "inline-flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+          <ConfBadge level={FAMILY_CONFIDENCE[fkey]} size={12} />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+          <span style={{ color: C.accent, fontSize: 9.5, fontFamily: FONT_MONO, flexShrink: 0 }}>·w{w}</span>
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "baseline", gap: 7, fontFamily: FONT_MONO, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+          {contrib != null && w > 0 && <span style={{ color: C.faint, fontSize: 9.5 }} title="points this family adds to the composite">+{contrib.toFixed(1)}</span>}
+          <span style={{ fontWeight: 700 }}>{val == null ? "—" : Math.round(val)}</span>
+        </span>
       </div>
       <div style={{ height: 7, background: C.grid, borderRadius: 4 }}>
         <div style={{ height: "100%", width: `${val ?? 0}%`, background: `linear-gradient(90deg,${C.primary},${C.accent})`, borderRadius: 4, transition: "width .3s" }} />
@@ -673,13 +858,15 @@ function DetailModal({ C, prog, close, weights, onField }) {
         <div style={{ color: C.dim, fontSize: 11.5, fontStyle: "italic" }}>No meaningful top-division presence in window.</div>
       </div>
     );
+    const contrib = contributions(brk, weights);
     return (
       <div style={{ flex: 1, minWidth: 210 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <span style={{ color: C.text, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Icon size={15} /> {title}</span>
           <span style={{ fontWeight: 700, color: TIER_META[tierFor(score)]?.color, fontFamily: FONT_MONO }}>{Math.round(score)} · {tierFor(score)}</span>
         </div>
-        {FAMILIES.map((f) => <Bar key={f.key} label={f.label} val={brk?.[f.key]} w={weights[f.key]} raw={raw?.[f.key]} />)}
+        {FAMILIES.map((f) => <Bar key={f.key} fkey={f.key} label={f.label} val={brk?.[f.key]} w={weights[f.key]} raw={raw?.[f.key]} contrib={contrib?.[f.key]} />)}
+        <div style={{ color: C.faint, fontSize: 9.5, marginTop: 2, fontStyle: "italic" }}>+values are points added to the {Math.round(score)} composite (they sum to the score).</div>
       </div>
     );
   };
@@ -697,11 +884,20 @@ function DetailModal({ C, prog, close, weights, onField }) {
           </div>
           <button ref={closeRef} className="btn" onClick={close}><IconClose size={14} /> Close</button>
         </div>
-        <div style={{ display: "flex", gap: 16, margin: "16px 0", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 16, margin: "16px 0", flexWrap: "wrap", alignItems: "flex-start" }}>
           <Stat C={C} l="Combined" v={prog.combined} big />
           <Stat C={C} l="Football" v={prog.cfbScore} />
           <Stat C={C} l="Basketball" v={prog.cbbScore} />
           {prog.balanceBonus > 0.3 && <Stat C={C} l="2-Sport Bonus" v={`+${prog.balanceBonus.toFixed(1)}`} raw />}
+          {(tt.cfb.length > 0 || tt.cbb.length > 0) && (
+            <div>
+              <div style={{ color: C.dim, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5 }} title="National championships in the ledger window">Natl titles · window</div>
+              <div style={{ display: "flex", gap: 14, marginTop: 4, fontFamily: FONT_MONO, fontVariantNumeric: "tabular-nums", fontSize: 22, fontWeight: 700, color: C.accent }}>
+                {tt.cfb.length > 0 && <span title={`Football titles: ${tt.cfb.join(", ")}`} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><IconFootball size={16} />{tt.cfb.length}</span>}
+                {tt.cbb.length > 0 && <span title={`Basketball titles: ${tt.cbb.join(", ")}`} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><IconBasketball size={16} />{tt.cbb.length}</span>}
+              </div>
+            </div>
+          )}
         </div>
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap", borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
           <SportBlock title="Football" Icon={IconFootball} score={prog.cfbScore} brk={prog.cfbBreak} sportKey="cfb" />
@@ -712,8 +908,16 @@ function DetailModal({ C, prog, close, weights, onField }) {
             This program has NCAA-vacated results. Scores reflect the <b style={{ color: C.text }}>{onField ? "on-field (vacated counted)" : "official (vacated removed)"}</b> setting — the Championships / Win% / Poll families are {onField ? "shown at full value" : "reduced"} accordingly. Toggle in the Filters rail.
           </div>
         )}
-        <div style={{ marginTop: 12, fontSize: 9.5, color: C.faint, lineHeight: 1.5 }}>
-          Scores are relative composites on the selected era window &amp; weights. Soft families (recruiting/poll/advanced/pro) are calibrated estimates, not exact records.
+        <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", fontSize: 10, color: C.dim, borderTop: `1px solid ${C.grid}`, paddingTop: 12 }}>
+          <span style={{ textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, color: C.faint }}>Confidence</span>
+          {Object.entries(CONFIDENCE).map(([k, c]) => (
+            <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <ConfBadge level={k} size={12} /> {c.label}
+            </span>
+          ))}
+        </div>
+        <div style={{ marginTop: 10, fontSize: 9.5, color: C.faint, lineHeight: 1.5 }}>
+          Scores are relative composites on the selected era window &amp; weights; each family's <b style={{ color: C.dim }}>+value</b> is the points it adds to the composite. Championships are grounded in the title record; Poll Presence ordering is anchored to sourced all-time AP totals with an estimated era split; recruiting / advanced / pro / era-split win% are calibrated estimates, not exact records.
         </div>
       </div>
     </div>
@@ -741,12 +945,14 @@ function MethodPanel({ C, close }) {
       <p><b style={{ color: C.text }}>Composite.</b> Weighted mean of the six families (default Champ 30 / Win% 20 / Pro 15 / Recruit 10 / Poll 15 / Adv 10). Combined = mean of CFB &amp; CBB plus a two-sport balance bonus (up to +6) rewarding schools strong in <i>both</i>. Single-sport programs take a 0.92 factor so they don't dominate the combined board on one leg.</p>
       <p><b style={{ color: C.text }}>Vacated toggle.</b> In <b>Official</b> mode, flagged programs have their Championships (×0.86), Win% (×0.93) and Poll (×0.95) families reduced to reflect vacated titles/wins; <b>On-field</b> restores them. The toggle now visibly changes those programs' scores.</p>
       <p><b style={{ color: C.text }}>Champions ledger.</b> The Champions tab is a season-by-season national-title record and the app's forward-looking surface — as each championship is decided, one row is appended and everything else stays put. Undecided seasons render as "awaiting result"; a season that held no championship (e.g. the 2020 NCAA tournament, cancelled for COVID-19) renders as "not held". Verified July 2026 against NCAA.com, ESPN &amp; CFP.com.</p>
+      <p><b style={{ color: C.text }}>Reading a rating.</b> Open any program for its full breakdown. Each family carries a confidence badge (<b style={{ color: CONFIDENCE.high.color }}>H</b> hard data · <b style={{ color: CONFIDENCE.anchor.color }}>A</b> anchored · <b style={{ color: CONFIDENCE.est.color }}>E</b> estimate) and the <b>+points</b> it contributes to the composite — the contributions sum exactly to the score, so the number is fully decomposable. National-title counts (shown in the modal, the Board's Titles column and the Champions tab) are read straight from the ledger.</p>
       <p><b style={{ color: C.text }}>Tiers.</b> Blue Blood ≥82 · Elite ≥70 · Power ≥58 · Solid ≥45 · Rising &lt;45, from the active composite.</p>
       <p><b style={{ color: C.text }}>Known limits.</b> Championships and Poll partly co-vary (great teams both win titles <i>and</i> stay ranked), so the effective weight on winning is higher than the 30% headline. Scores are also résumé-based, not opponent-adjusted — era strength is baked into the estimates rather than derived. See <b>METHODOLOGY.md</b> in the repo for the full assessment and planned upgrades.</p>
       <p style={{ color: C.accent, marginBottom: 4 }}><b>Data confidence — read this.</b></p>
       <ul style={{ margin: "4px 0", paddingLeft: 18, color: C.dim }}>
-        <li><b style={{ color: C.text }}>High confidence:</b> national titles, Final Fours, the champions ledger, conference era/affiliation, vacated-result flags.</li>
-        <li><b style={{ color: C.accent }}>Calibrated analyst estimates:</b> recruiting, poll-weeks, advanced metrics, pro-production counts, and era-split win% are relative approximations, not exact sourced season figures.</li>
+        <li><b style={{ color: CONFIDENCE.high.color }}>H · High confidence:</b> national titles, Final Fours, the champions ledger, conference era/affiliation, vacated-result flags.</li>
+        <li><b style={{ color: CONFIDENCE.anchor.color }}>A · Anchored estimate:</b> Poll Presence — program ordering is pinned to sourced all-time AP totals (Ohio State leads CFB weeks-in-poll; Alabama most weeks at No. 1; North Carolina most CBB poll appearances; Duke's record 150 weeks at No. 1; Kansas's record ranked-every-week streak), with the per-era split estimated.</li>
+        <li><b style={{ color: CONFIDENCE.est.color }}>E · Calibrated estimate:</b> recruiting, advanced metrics, pro-production counts, and era-split win% are relative approximations, not exact sourced figures.</li>
         <li><b style={{ color: C.text }}>Nulls:</b> programs with negligible top-division presence in an era store null and are excluded from that era's aggregation (e.g. Gonzaga pre-1990 CBB).</li>
       </ul>
       <p style={{ color: C.dim, marginBottom: 0 }}>For exact figures, the intended source stack is Sports-Reference, NCAA record books, KenPom (post-2002 CBB), and SRS/SP+. This build uses curated aggregates so it runs with no external calls.</p>

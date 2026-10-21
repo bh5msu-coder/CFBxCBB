@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  eraWeights, programFamilyScore, computeSportScore, blendBreakdown, tierFor, TIER_ORDER,
+  eraWeights, programFamilyScore, computeSportScore, blendBreakdown, contributions, tierFor, TIER_ORDER,
 } from "./scoring.js";
 import { DEFAULT_WEIGHTS, VACATED_OFFICIAL_FACTOR } from "./data.js";
 
@@ -84,6 +84,26 @@ describe("computeSportScore", () => {
     expect(r.breakdown.champ).toBe(50);
     expect(r.score).toBeGreaterThan(0);
     expect(r.score).toBeLessThanOrEqual(100);
+  });
+});
+
+describe("contributions", () => {
+  const brkArr = { champ: [50, 50, 50, 50], winpct: [70, 70, 70, 70], pro: [60, 60, 60, 60], recruit: [80, 80, 80, 80], poll: [40, 40, 40, 40], adv: [90, 90, 90, 90] };
+  const brk = { champ: 50, winpct: 70, pro: 60, recruit: 80, poll: 40, adv: 90 };
+  it("sums exactly to the composite score (number is fully decomposable)", () => {
+    const c = contributions(brk, DEFAULT_WEIGHTS);
+    const sum = Object.values(c).reduce((a, b) => a + (b ?? 0), 0);
+    const r = computeSportScore({ cfb: brkArr }, "cfb", DEFAULT_WEIGHTS, ALL_ERAS, 0, false);
+    expect(sum).toBeCloseTo(r.score, 6);
+  });
+  it("returns null for null families and renormalizes over the rest", () => {
+    const c = contributions({ champ: 50, winpct: null }, { champ: 10, winpct: 10, pro: 0, recruit: 0, poll: 0, adv: 0 });
+    expect(c.winpct).toBeNull();
+    expect(c.champ).toBeCloseTo(50, 6); // only surviving weighted family carries the whole score
+  });
+  it("gives zero contribution to a zero-weight family", () => {
+    const c = contributions(brk, { champ: 0, winpct: 20, pro: 15, recruit: 10, poll: 15, adv: 10 });
+    expect(c.champ).toBe(0);
   });
 });
 
