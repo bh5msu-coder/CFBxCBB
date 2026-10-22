@@ -2,9 +2,12 @@
 // DATA & METHODOLOGY
 // HARD DATA (high confidence): national titles, Final Fours, conference era,
 //   and the season-by-season champions ledger (CHAMPIONS, below).
-// CALIBRATED ESTIMATES (flagged): recruiting, poll-weeks, advanced, pro counts,
-//   and era-split win%. These are analyst approximations on a 0-100 relative
-//   scale, NOT exact sourced season figures. Do not cite as official records.
+// CALIBRATED ESTIMATES (flagged): recruiting, advanced, pro counts, and
+//   era-split win%. Analyst approximations on a 0-100 relative scale, NOT exact
+//   sourced season figures. Do not cite as official records.
+// ANCHORED ESTIMATE: poll-weeks — program ordering is pinned to sourced all-time
+//   AP totals (see POLL_ANCHORS); the per-era split remains an estimate.
+// Per-family + per-era confidence live in FAMILY_CONFIDENCE / ERA_CONFIDENCE.
 // Era buckets: E1 1976-89, E2 1990-99, E3 2000-09, E4 2010-25.
 // Each metric per sport is stored as a 4-length era array [E1,E2,E3,E4] on a
 // 0-100 relative scale (100 = best-in-class for that family over the window).
@@ -40,17 +43,17 @@ const P = (champ, winpct, pro, recruit, poll, adv) => ({ champ, winpct, pro, rec
 // Illustrative summaries from well-known program totals, not full records.
 // ---------------------------------------------------------------------------
 export const RAW = {
-  "Kansas":          { cbb: { champ: "3 titles · 16 Final Fours", winpct: "~.700 all-time", poll: "most AP weeks ranked (CBB)", adv: "KenPom top-10 staple" } },
-  "Duke":            { cbb: { champ: "5 titles · 17 Final Fours", winpct: "elite .760+", pro: "most NBA lottery picks (mod. era)", poll: "perennial AP top-10" } },
-  "North Carolina":  { cbb: { champ: "6 titles · 21 Final Fours", winpct: "winningest CBB program", poll: "perennial AP top-10" } },
-  "Kentucky":        { cbb: { champ: "8 titles · 17 Final Fours", winpct: "winningest by %", pro: "NBA draft factory" } },
+  "Kansas":          { cbb: { champ: "3 titles · 16 Final Fours", winpct: "~.700 all-time", poll: "record ranked-every-week streak", adv: "KenPom top-10 staple" } },
+  "Duke":            { cbb: { champ: "5 titles · 17 Final Fours", winpct: "elite .760+", pro: "most NBA lottery picks (mod. era)", poll: "record 150 weeks at AP No. 1" } },
+  "North Carolina":  { cbb: { champ: "6 titles · 21 Final Fours", winpct: "winningest CBB program", poll: "most AP poll appearances all-time" } },
+  "Kentucky":        { cbb: { champ: "8 titles · 17 Final Fours", winpct: "winningest by %", pro: "NBA draft factory", poll: "top AP all-time points (CBB)" } },
   "UCLA":            { cbb: { champ: "11 titles · 18 Final Fours", winpct: "Wooden dynasty 1964–75 anchors E1" } },
   "Connecticut":     { cbb: { champ: "6 titles (2 of last 2 played)", poll: "post-1990 surge" } },
   "Gonzaga":         { cbb: { champ: "2 F4 · 0 titles", winpct: "highest win% of the 2010s", recruit: "data begins ~2005" } },
   "Villanova":       { cbb: { champ: "3 titles · 6 Final Fours" } },
   "Indiana":         { cbb: { champ: "5 titles (last 1987)", adv: "Knight-era dominance in E1" } },
-  "Alabama":         { cfb: { champ: "title-rich; CFP era peak", winpct: "Saban dynasty anchors E4", pro: "1st-round draft leader" } },
-  "Ohio State":      { cfb: { champ: "natl titles + most Big Ten crowns", poll: "most AP weeks ranked (CFB)", pro: "1st-round factory" } },
+  "Alabama":         { cfb: { champ: "title-rich; CFP era peak", winpct: "Saban dynasty anchors E4", pro: "1st-round draft leader", poll: "most weeks at AP No. 1 (CFB)" } },
+  "Ohio State":      { cfb: { champ: "natl titles + most Big Ten crowns", poll: "most weeks in AP poll, all-time (CFB)", pro: "1st-round factory" } },
   "Oklahoma":        { cfb: { champ: "7 natl titles · most conf titles", winpct: "top-3 all-time win%" } },
   "Notre Dame":      { cfb: { champ: "11 claimed titles (mostly pre-window)", poll: "independent AP mainstay" } },
   "Nebraska":        { cfb: { champ: "titles 1994–97 anchor E2", winpct: "dominant E1–E2, faded after" } },
@@ -302,3 +305,55 @@ export const CHAMPIONS = [
   { year: 1977, cfb: "Notre Dame",     cbb: "Marquette" },
   { year: 1976, cfb: "Pittsburgh",     cbb: "Indiana" },         // Pitt 12–0 (Dorsett) · Indiana's last unbeaten title
 ];
+
+// ---------------------------------------------------------------------------
+// DERIVED: TITLE TALLY  (aggregates the ledger — no new data)
+// ---------------------------------------------------------------------------
+// Counts decided championships per program inside the ledger window, by sport,
+// keeping the winning years. Vacated-but-on-field titles (e.g. Louisville 2013,
+// USC 2004) are counted as won — the program's `vacated` flag carries that
+// caveat — and `null` / CANCELLED rows are skipped. This powers the title
+// badges and the "most titles" ranking without a second source of truth.
+export function titleTally() {
+  const t = {};
+  const add = (name, sport, year) => {
+    if (!name || name === CANCELLED) return;
+    (t[name] ||= { cfb: [], cbb: [] })[sport].push(year);
+  };
+  CHAMPIONS.forEach((s) => { add(s.cfb, "cfb", s.year); add(s.cbb, "cbb", s.year); });
+  return t;
+}
+export const TITLES = titleTally();
+export const titlesFor = (name) => TITLES[name] || { cfb: [], cbb: [] };
+export const titleTotal = (name) => { const t = titlesFor(name); return t.cfb.length + t.cbb.length; };
+
+// ---------------------------------------------------------------------------
+// DATA CONFIDENCE LAYER  (feature: "how to read this")
+// ---------------------------------------------------------------------------
+// Per-family confidence. Never color-only: each level carries a letter badge
+// and a plain-language note so meaning survives for colorblind readers and in
+// both themes. `anchor` marks families whose relative ORDERING is pinned to a
+// sourced all-time total even though the era split remains an estimate.
+export const CONFIDENCE = {
+  high:   { badge: "H", color: "#10b981", label: "Hard data",           note: "grounded in the sourced record (titles, Final Fours, the ledger)" },
+  anchor: { badge: "A", color: "#3b82f6", label: "Anchored estimate",   note: "program ordering anchored to sourced all-time AP poll totals; the era split is estimated" },
+  est:    { badge: "E", color: "#f5b301", label: "Calibrated estimate", note: "analyst approximation on a relative 0–100 scale, not a sourced season figure" },
+};
+export const FAMILY_CONFIDENCE = {
+  champ: "high", winpct: "est", pro: "est", recruit: "est", poll: "anchor", adv: "est",
+};
+// Earlier eras lean more on estimate than the modern CFP / KenPom era, where
+// per-week poll, recruiting and advanced data are abundant and sourceable.
+export const ERA_CONFIDENCE = { E1: "est", E2: "est", E3: "anchor", E4: "high" };
+
+// Sourced anchors behind the Poll Presence family (verified Oct 2026). Exact
+// per-era weekly counts are not cleanly sourceable, so only the all-time
+// ordering is treated as hard; the era split stays a calibrated estimate.
+//   · CFB weeks in AP poll — Ohio State leads all-time (Winsipedia).
+//   · CFB weeks at AP No. 1 — Alabama leads all-time (Wikipedia).
+//   · CBB poll appearances — North Carolina most all-time; Duke record weeks at
+//     No. 1 (150, ESPN); Kansas record consecutive ranked-week streak.
+export const POLL_ANCHORS = {
+  cfb: ["Ohio State", "Michigan", "Oklahoma", "Alabama", "Notre Dame"],
+  cbb: ["North Carolina", "Kentucky", "Duke", "Kansas", "UCLA"],
+};
