@@ -7,6 +7,7 @@ import { TIER_META, tierFor } from "./scoring.js";
 import { FONT_UI, FONT_MONO } from "./theme.js";
 import { IconFootball, IconBasketball, IconStar, IconCheck, IconClose, IconDownload, IconLink, IconTrophy } from "./icons.jsx";
 import { loadGame, saveGame } from "./store.js";
+import { castVote, fetchRatings, totalDuels, enabled as communityEnabled } from "./community.js";
 import {
   PROFILES, PROFILE_BY_NAME, MODEL_RANK, dayNumber, dayKey, puzzleNumber, msUntilMidnight,
   dailyTarget, MAX_GUESSES, evaluateGuess, CUE_KEYS, cellEmoji, hintsFor, shareText, searchProfiles, applyDailyResult,
@@ -277,14 +278,38 @@ function Duels({ C, game, update, openByName, panel }) {
   const [pair, setPair] = useState(() => pickDuel());
   const [confirmReset, setConfirmReset] = useState(false);
   const elo = game.duels.elo;
+
+  // Community ratings: best-effort, refreshed on open and shortly after voting.
+  const [community, setCommunity] = useState(null);
+  const [communityState, setCommunityState] = useState(communityEnabled() ? "loading" : "off");
+  const refreshTimer = useRef(null);
+  const loadCommunity = async () => {
+    if (!communityEnabled()) return;
+    const rows = await fetchRatings();
+    if (rows) { setCommunity(rows); setCommunityState("ok"); } else setCommunityState("error");
+  };
+  useEffect(() => { loadCommunity(); return () => clearTimeout(refreshTimer.current); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const vote = (winnerIdx) => {
     const [a, b] = pair;
     const ra = elo[a.name] ?? ELO_START, rb = elo[b.name] ?? ELO_START;
     const [na, nb] = eloUpdate(ra, rb, winnerIdx === 0);
     update((g) => ({ ...g, duels: { elo: { ...g.duels.elo, [a.name]: na, [b.name]: nb }, votes: g.duels.votes + 1 } }));
     setPair(pickDuel(Math.random, [a.name, b.name]));
+    // Fire-and-forget to the community; a failure never affects local play.
+    const [w, l] = winnerIdx === 0 ? [a, b] : [b, a];
+    castVote(w.name, l.name).then((ok) => {
+      if (!ok) return;
+      clearTimeout(refreshTimer.current);
+      refreshTimer.current = setTimeout(loadCommunity, 1500);
+    });
   };
   const ranking = useMemo(() => eloRanking(elo).slice(0, 10), [elo]);
+  const communityRanking = useMemo(() => {
+    if (!community?.length) return [];
+    return eloRanking(Object.fromEntries(community.map((r) => [r.program, r.rating]))).slice(0, 10);
+  }, [community]);
+  const communityDuels = totalDuels(community);
   const Card = ({ p, onPick }) => (
     <button onClick={onPick} aria-label={`Pick ${p.name}`}
       style={{ flex: 1, minWidth: 180, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, cursor: "pointer", textAlign: "left", color: C.text, fontFamily: FONT_UI, transition: "border-color .15s" }}
@@ -305,7 +330,7 @@ function Duels({ C, game, update, openByName, panel }) {
           <span style={{ fontWeight: 700, fontSize: 15 }}>Who's the better program?</span>
           <span style={{ color: C.dim, fontSize: 10.5, fontFamily: FONT_MONO }}>{game.duels.votes} votes cast</span>
         </div>
-        <div style={{ color: C.dim, fontSize: 11.5, marginBottom: 12 }}>Gut call — scores are hidden on purpose. Each vote updates your personal Elo ranking of the field.</div>
+        <div style={{ color: C.dim, fontSize: 11.5, marginBottom: 12 }}>Gut call — scores are hidden on purpose. Each vote updates your personal Elo ranking of the field{communityState !== "off" ? " and, anonymously, the community's" : ""}.</div>
         <div style={{ display: "flex", gap: 12, alignItems: "stretch", flexWrap: "wrap" }}>
           <Card p={pair[0]} onPick={() => vote(0)} />
           <div style={{ alignSelf: "center", color: C.faint, fontWeight: 700, fontSize: 12 }}>vs</div>
@@ -344,6 +369,42 @@ function Duels({ C, game, update, openByName, panel }) {
         )}
         <div style={{ color: C.faint, fontSize: 9.5, marginTop: 8 }}>Δ = how many places higher (+) or lower (−) you rank a program than the model does. Unvoted programs sit at {ELO_START}.</div>
       </div>
+
+      {communityState !== "off" && (
+        <div style={panel} data-testid="community-panel">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+            <span style={{ fontWeight: 700, fontSize: 14 }}>The community vs. the model</span>
+            <span style={{ color: C.dim, fontSize: 10.5, fontFamily: FONT_MONO }}>
+              {communityState === "ok" ? `${communityDuels.toLocaleString()} community duel${communityDuels === 1 ? "" : "s"}` : communityState === "loading" ? "loading…" : "unavailable right now"}
+            </span>
+          </div>
+          {communityState === "ok" && communityRanking.length === 0 && (
+            <div style={{ color: C.dim, fontSize: 11.5 }}>No community votes yet — yours will be the first. Every vote here is anonymous and counted once.</div>
+          )}
+          {communityState === "error" && (
+            <div style={{ color: C.dim, fontSize: 11.5 }}>Couldn't reach the community rankings. Your votes still count locally and will be sent when you're back online.</div>
+          )}
+          {communityState === "ok" && communityRanking.length > 0 && (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: FONT_MONO, fontSize: 12 }}>
+              <thead><tr style={{ color: C.dim, fontSize: 10, textTransform: "uppercase", fontFamily: FONT_UI }}>
+                <th style={{ textAlign: "left", padding: "4px 6px" }}>#</th><th style={{ textAlign: "left", padding: "4px 6px" }}>Program</th><th style={{ padding: "4px 6px" }}>Elo</th><th style={{ padding: "4px 6px" }}>Model</th><th style={{ padding: "4px 6px" }}>Δ</th>
+              </tr></thead>
+              <tbody>
+                {communityRanking.map((r) => (
+                  <tr key={r.name} style={{ borderTop: `1px solid ${C.grid}` }}>
+                    <td style={{ padding: "5px 6px", color: C.dim }}>{r.rank}</td>
+                    <td style={{ padding: "5px 6px", fontFamily: FONT_UI, fontWeight: 600 }}><NameLink C={C} name={r.name} openByName={openByName} /></td>
+                    <td style={{ padding: "5px 6px", textAlign: "center" }}>{Math.round(r.r)}</td>
+                    <td style={{ padding: "5px 6px", textAlign: "center", color: C.dim }}>#{r.modelRank}</td>
+                    <td style={{ padding: "5px 6px", textAlign: "center", fontWeight: 700, color: r.delta > 0 ? TIER_META.Power.color : r.delta < 0 ? "#ef4444" : C.faint }}>{r.delta > 0 ? `+${r.delta}` : r.delta}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <div style={{ color: C.faint, fontSize: 9.5, marginTop: 8 }}>Aggregated from everyone's anonymous votes (rate-limited per browser; no accounts, nothing personal stored). The gap between this table and the model is the whole point.</div>
+        </div>
+      )}
     </div>
   );
 }
