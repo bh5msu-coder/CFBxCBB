@@ -4,18 +4,20 @@ import {
   FAMILY_CONFIDENCE, CONFIDENCE, ERA_CONFIDENCE, TITLES, titlesFor, titleTotal,
 } from "./data.js";
 import {
-  computeSportScore, blendBreakdown, contributions, tierFor, TIER_ORDER, TIER_META,
+  computeSportScore, blendBreakdown, combinedScore, contributions, tierFor, TIER_ORDER, TIER_META,
 } from "./scoring.js";
 import { THEMES, FONT_UI, FONT_MONO } from "./theme.js";
 import {
   IconLadder, IconQuadrant, IconGrid, IconTrophy, IconInfo, IconStar, IconFlag,
   IconClose, IconReset, IconSun, IconMoon, IconDownload, IconFootball, IconBasketball, IconCompare,
-  IconLink, IconCheck, IconTable,
+  IconLink, IconCheck, IconTable, IconPlay,
 } from "./icons.jsx";
 
 // Recharts is code-split into charts.jsx and only fetched when a chart view opens.
 const ScatterView = lazy(() => import("./charts.jsx").then((m) => ({ default: m.ScatterView })));
 const CompareChart = lazy(() => import("./charts.jsx").then((m) => ({ default: m.CompareChart })));
+// The Play layer (daily puzzle, duels, predictions…) is its own chunk too.
+const PlayHub = lazy(() => import("./play.jsx"));
 
 const PROGRAM_BY_NAME = Object.fromEntries(ACTIVE.map((p) => [p.name, p]));
 
@@ -26,6 +28,7 @@ const VIEWS = [
   { key: "heatmap", label: "Heatmap", Icon: IconGrid },
   { key: "compare", label: "Compare", Icon: IconCompare },
   { key: "champions", label: "Champions", Icon: IconTrophy },
+  { key: "play", label: "Play", Icon: IconPlay },
 ];
 
 // Small, non-color-only confidence badge used across the detail modal, board
@@ -141,14 +144,7 @@ export default function App() {
     return ACTIVE.map((p) => {
       const cfb = computeSportScore(p, "cfb", weights, selectedEras, recency, onField);
       const cbb = computeSportScore(p, "cbb", weights, selectedEras, recency, onField);
-      let combined = null, balanceBonus = 0;
-      if (cfb && cbb) {
-        const avg = (cfb.score + cbb.score) / 2;
-        const minS = Math.min(cfb.score, cbb.score);
-        balanceBonus = (minS / 100) * 6;
-        combined = Math.min(100, avg + balanceBonus);
-      } else if (cfb) combined = cfb.score * 0.92;
-      else if (cbb) combined = cbb.score * 0.92;
+      const { score: combined, balanceBonus } = combinedScore(cfb?.score ?? null, cbb?.score ?? null);
       const active = sport === "combined" ? combined : sport === "cfb" ? cfb?.score : cbb?.score;
       const combBreak = cfb && cbb ? blendBreakdown(cfb.breakdown, cbb.breakdown) : (cfb?.breakdown || cbb?.breakdown);
       return {
@@ -178,6 +174,8 @@ export default function App() {
   }, [ranked]);
 
   const resetWeights = () => setWeights({ ...DEFAULT_WEIGHTS });
+  // Personas from the Play layer re-weight the live model in one shot.
+  const applyPreset = (p) => { setWeights({ ...p.weights }); setSelectedEras({ ...p.eras }); setRecency(p.recency); };
   const toggleSpotlight = (name) =>
     setSpotlight((s) => (s.includes(name) ? s.filter((n) => n !== name) : [...s, name]));
   const openByName = (name) => { if (PROGRAM_BY_NAME[name]) setDetail(scored.find((p) => p.name === name)); };
@@ -301,7 +299,7 @@ export default function App() {
         </aside>
 
         <main style={{ flex: 1, minWidth: 300 }}>
-          {view !== "champions" && view !== "compare" && (
+          {view !== "champions" && view !== "compare" && view !== "play" && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10, marginBottom: 14 }}>
               <StatTile C={C} label="Programs ranked" value={kpis.count} />
               <StatTile C={C} label={`Top ${sport === "combined" ? "combined" : sport === "cfb" ? "football" : "basketball"}`}
@@ -310,7 +308,11 @@ export default function App() {
             </div>
           )}
 
-          {!anyEra ? (
+          {view === "play" ? (
+            <Suspense fallback={<ChartFallback C={C} />}>
+              <PlayHub C={C} ranked={ranked} sport={sport} weights={weights} selectedEras={selectedEras} recency={recency} applyPreset={applyPreset} openByName={openByName} />
+            </Suspense>
+          ) : !anyEra ? (
             <EmptyState C={C} title="No era selected" msg="Pick one or more era windows in the left rail to build the rankings." />
           ) : view === "champions" ? (
             <ChampionsView C={C} openByName={openByName} />
@@ -367,7 +369,7 @@ function GlobalStyle({ C }) {
       .row{transition:background .15s,border-color .15s,transform .15s;}
       .row:hover{background:${C.panel2};}
       button:focus-visible,[tabindex]:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid ${C.accent};outline-offset:2px;}
-      @media (max-width:880px){.rail{width:100%!important;}}
+      @media (max-width:880px){.rail{width:100%!important;}.play-grid{grid-template-columns:1fr!important;}}
       @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important;}}
     `}</style>
   );
