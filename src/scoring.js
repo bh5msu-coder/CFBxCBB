@@ -47,6 +47,21 @@ export function computeSportScore(prog, sport, weights, selectedEras, recency, o
   return { score: total / wsum, breakdown };
 }
 
+// Two-sport composite. Mean of CFB & CBB plus a balance bonus (up to +6) that
+// rewards being strong in BOTH; a single-sport program takes a 0.92 factor so
+// it can't dominate the combined board on one leg. Shared by the live board
+// and the Play layer's canonical profiles so the two never drift.
+export function combinedScore(cfb, cbb) {
+  if (cfb != null && cbb != null) {
+    const avg = (cfb + cbb) / 2;
+    const balanceBonus = (Math.min(cfb, cbb) / 100) * 6;
+    return { score: Math.min(100, avg + balanceBonus), balanceBonus };
+  }
+  if (cfb != null) return { score: cfb * 0.92, balanceBonus: 0 };
+  if (cbb != null) return { score: cbb * 0.92, balanceBonus: 0 };
+  return { score: null, balanceBonus: 0 };
+}
+
 // Per-family blend of the two sports — used so the Heatmap's family columns
 // reconcile with the Combined score column (fixes the CFB-only mismatch).
 export function blendBreakdown(cfbBreak, cbbBreak) {
